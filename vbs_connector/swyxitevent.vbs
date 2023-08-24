@@ -1,0 +1,125 @@
+option explicit
+
+rem cmdline to execute per default on each line
+rem use %num% as placeholder for the caller number and %name% for the caller name
+dim sCmdLineDefault
+sCmdLineDefault = "C:\Users\bauhaus\PycharmProjects\wowiport_swyx\venv\Scripts\pythonw.exe C:\Users\bauhaus\PycharmProjects\wowiport_swyx\swclient\swclient.py %num%"
+
+rem cmdline to execute on specific lines. Default is used when nothing is specified here
+rem Increase this array if you have more lines
+dim sCmdLine(4)
+sCmdLine(0) = ""
+sCmdLine(1) = ""
+sCmdLine(2) = ""
+sCmdLine(3) = ""
+
+
+rem set this to true to enable verbose tracing
+dim VerboseTracing
+VerboseTracing = false
+
+
+rem don't change anything below this line
+rem =================================================================================
+
+
+dim clmgr
+set clmgr = WScript.CreateObject("CLMGR.ClientLineMgr","clmgr_")
+
+rem line states
+const PubLSNone =-1
+const PubLSInactive=0
+const PubLSHookOffInternal=1
+const PubLSHookOffExternal=2
+const PubLSRinging=3
+const PubLSDialing=4
+const PubLSAlerting=5
+const PubLSKnocking=6
+const PubLSBusy=7
+const PubLSActive=8
+const PubLSOnHold=9
+const PubLSConferenceActive=10
+const PubLSConferenceOnHold=11
+const PubLSTerminated=12
+const PubLSTransferring=13
+const PubLSDisabled=14
+const PubLSDirectCall=15
+
+rem notification messsage ids
+const PubCLMgrLineStateChangedMessageEx = 28
+
+rem line state arrays
+redim lStateOld(4)
+redim lState (4)
+
+dim numLines
+numLines = CInt(clmgr.DispNumberOfLines)
+Trace "found " & numLines & " lines."
+
+if numLines>4 then
+	redim lStateOld(numLines)
+	redim lState(numLines)
+end if
+
+dim i
+for i=0 to numLines-1
+	lState(i) = clmgr.DispGetLine(i).DispState
+	lStateOld(i) = clmgr.DispGetLine(i).DispState
+next
+
+TraceLineStates
+
+dim oWshShell 
+set oWshShell = WScript.CreateObject("WScript.Shell")
+
+Do Until (0)
+	WSCript.Sleep 1000
+Loop
+
+
+function clmgr_DispOnLineMgrNotification(msg, param)
+    if msg=PubCLMgrLineStateChangedMessageEx then
+        rem line state changed
+		dim lineIdx
+		lineIdx = cint(param)and 255
+		lState(lineIdx) = (cint(param) and &Hff00) / &H100
+        Trace vbLF & "param: " & param & " line " & lineIdx & " state: " & lState(lineIdx)
+		rem when line state changes from inactive to ringing
+		if lState(lineIdx)=PubLSRinging and lStateOld(lineIdx)=PubLSInactive then
+			rem state changed from inactive to ringing
+			dim sTemp
+			sTemp = GetCmdLine(lineIdx)
+			sTemp = Replace(sTemp,"%num%",Escape(clmgr.DispGetLine(lineIdx).DispPeerNumber))
+			sTemp = Replace(sTemp,"%name%",Escape(clmgr.DispGetLine(lineIdx).DispPeerName))
+			oWshShell.Run sTemp
+		end if
+		TraceLineStates
+		lStateOld(lineIdx) = lState(lineIdx)
+    end if
+end function
+
+sub Trace(msg)
+	if VerboseTracing then
+		WScript.Echo msg
+	end if
+end sub
+
+sub TraceLineStates
+	if VerboseTracing then
+		WScript.Echo "=================================="
+		for i=0 to numLines-1
+			WScript.Echo "Line " & i & ": lStateOld: " & vbTab & lStateOld(i) & " lState: " & vbTab & lState(i)
+		next
+		WScript.Echo "=================================="
+	end if
+end sub
+
+function GetCmdLine(lineidx)
+	if lineIdx<LBound(sCmdLine) or UBound(sCmdLine)>=lineIdx then
+		GetCmdLine = sCmdLineDefault
+	elseif sCmdLine(lineIdx)="" then
+	    GetCmdLine = sCmdLineDefault
+	else
+		GetCmdLine = sCmdLine(lineIdx)
+	end if
+end function
