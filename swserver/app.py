@@ -79,6 +79,8 @@ def caller_info():
         cur.execute(query, (clientname, ))
         con.commit()
 
+    con.close()
+
     if int(clientrow[0]) != 1:
         return 'client_disabled', 200
 
