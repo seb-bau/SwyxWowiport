@@ -56,7 +56,9 @@ address_city = ""
 rjson = None
 if response.status_code == 200:
     rjson = response.json()
-    caller_name = f"{rjson.get('LastName')}, {rjson.get('FirstName')}"
+    caller_name = f"{rjson.get('LastName')}"
+    if rjson.get('FirstName') is not None and len(rjson.get('FirstName')) > 0:
+        caller_name = f"{caller_name}, {rjson.get('FirstName')}"
     if rjson.get('Address') is not None:
         address_street = f"{rjson.get('Address').get('street')}"
         address_city = f"{rjson.get('Address').get('postcode')} {rjson.get('Address').get('city')}"

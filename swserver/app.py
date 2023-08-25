@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, json
 from dotenv import dotenv_values
-from wowipy.wowipy import WowiPy, Contractor
+from wowipy.wowipy import WowiPy, Contractor, Person
 from datetime import datetime
 import sqlite3
 import os
@@ -18,8 +18,12 @@ wowi = WowiPy(wowi_host, wowi_user, wowi_pass, wowi_key)
 # catalogs = wowi.get_communication_catalogs()
 cache_contractors = settings.get("cache_contractors")
 cache_use_units = settings.get("cache_use_units")
+cache_use_persons = settings.get("cache_persons")
+
+search_base = settings.get("search_base", "person").lower()
 wowi.cache_from_disk(cache_type=wowi.CACHE_CONTRACTORS, file_name=cache_contractors)
 wowi.cache_from_disk(cache_type=wowi.CACHE_USE_UNITS, file_name=cache_use_units)
+wowi.cache_from_disk(cache_type=wowi.CACHE_PERSONS, file_name=cache_use_persons)
 
 
 def get_token(header):
@@ -78,6 +82,7 @@ def caller_info():
         query = "INSERT INTO clients(hostname) VALUES(?)"
         cur.execute(query, (clientname, ))
         con.commit()
+        clientrow = [1]
 
     con.close()
 
@@ -89,23 +94,39 @@ def caller_info():
 
     phone = phone.replace(' 49', '0')
     print(phone)
-
-    caller_found = wowi.search_contractor(search_phone=phone, allow_duplicates=True)
-    if len(caller_found) == 0:
-        return 'caller_not_found', 404
-
-    first_contractor: Contractor
-    first_contractor = caller_found[0]
-
-    if first_contractor.person.natural_person is not None:
-        first_name = first_contractor.person.natural_person.first_name
-        last_name = first_contractor.person.natural_person.last_name
+    first_person: Person
+    if search_base == "contractor":
+        caller_found = wowi.search_contractor(search_phone=phone, allow_duplicates=True)
+        if len(caller_found) > 0:
+            first_contractor: Contractor
+            first_contractor = caller_found[0]
+            first_person = first_contractor.person
+        else:
+            return 'caller_not_found', 404
     else:
-        first_name = None
-        last_name = None
+        caller_found = wowi.search_person(search_phone=phone)
+        if len(caller_found) > 0:
+            first_person = caller_found[0]
+        else:
+            return 'caller_not_found', 404
 
-    if first_contractor.person.addresses is not None:
-        first_address = first_contractor.person.addresses[0]
+    if first_person.is_natural_person:
+        if first_person.natural_person is not None:
+            first_name = first_person.natural_person.first_name
+            last_name = first_person.natural_person.last_name
+        else:
+            first_name = None
+            last_name = None
+    else:
+        if first_person.legal_person is not None:
+            first_name = first_person.legal_person.long_name2
+            last_name = first_person.legal_person.long_name1
+        else:
+            first_name = None
+            last_name = None
+
+    if first_person.addresses is not None:
+        first_address = first_person.addresses[0]
         addr = {
             'street': first_address.street_complete,
             'postcode': first_address.zip_,
@@ -114,30 +135,28 @@ def caller_info():
     else:
         addr = None
 
-    # Alle Contractors durchlaufen.
-    # Wir vergleichen die Person-ID mit dem ersten Contractor, weil es sein kann, dass unter einer Telefon-
-    # nummer mehrere Personen eingetragen sind. So verhindern wir eine Vermischung der Daten
+    # Alle Verträge zur Person durchlaufen
     contract_list = []
     cont: Contractor
-    for cont in caller_found:
-        if cont.person.id_ == first_contractor.person.id_:
-            if cont.end_of_contract is not None:
-                if type(cont.end_of_contract) == str:
-                    eoc = datetime.strptime(str(cont.end_of_contract), "%Y-%m-%d")
-                else:
-                    eoc = cont.end_of_contract
-                if datetime.today() > eoc:
-                    print(f"{eoc} liegt nach {datetime.today()}")
-                    continue
-            t_contract = {
-                "Id": cont.license_agreement_id,
-                "IdNum": cont.license_agreement
-            }
-            contract_list.append(t_contract)
+    contractors_found = wowi.get_contractors(person_id=first_person.id_, use_cache=True)
+    for cont in contractors_found:
+        if cont.end_of_contract is not None:
+            if type(cont.end_of_contract) == str:
+                eoc = datetime.strptime(str(cont.end_of_contract), "%Y-%m-%d")
+            else:
+                eoc = cont.end_of_contract
+            if datetime.today() > eoc:
+                print(f"{eoc} liegt nach {datetime.today()}")
+                continue
+        t_contract = {
+            "Id": cont.license_agreement_id,
+            "IdNum": cont.license_agreement
+        }
+        contract_list.append(t_contract)
 
     ret_dict = {
-        "IdNum": first_contractor.person.id_num,
-        "Id": first_contractor.person.id_,
+        "IdNum": first_person.id_num,
+        "Id": first_person.id_,
         "FirstName": first_name,
         "LastName": last_name,
         "Address": addr,
