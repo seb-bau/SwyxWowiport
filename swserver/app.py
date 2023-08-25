@@ -75,7 +75,9 @@ def caller_info():
 
     clientrow = cur.fetchone()
     if not clientrow:
-        return 'client_not_found', 400
+        query = "INSERT INTO clients(hostname) VALUES(?)"
+        cur.execute(query, (clientname, ))
+        con.commit()
 
     if int(clientrow[0]) != 1:
         return 'client_disabled', 200
