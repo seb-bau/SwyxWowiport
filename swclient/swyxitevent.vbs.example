@@ -3,7 +3,7 @@ option explicit
 rem cmdline to execute per default on each line
 rem use %num% as placeholder for the caller number and %name% for the caller name
 dim sCmdLineDefault
-sCmdLineDefault = "C:\Users\bauhaus\PycharmProjects\wowiport_swyx\venv\Scripts\pythonw.exe C:\Users\bauhaus\PycharmProjects\wowiport_swyx\swclient\swclient.py %num%"
+sCmdLineDefault = "C:\Python311\pythonw.exe C:\SwyxWowiport\swclient.py %num%"
 
 rem cmdline to execute on specific lines. Default is used when nothing is specified here
 rem Increase this array if you have more lines
@@ -69,7 +69,7 @@ next
 
 TraceLineStates
 
-dim oWshShell 
+dim oWshShell
 set oWshShell = WScript.CreateObject("WScript.Shell")
 
 Do Until (0)

@@ -55,6 +55,8 @@ address_street = ""
 address_city = ""
 rjson = None
 if response.status_code == 200:
+    if 'client_disabled' in response.text:
+        exit()
     rjson = response.json()
     caller_name = f"{rjson.get('LastName')}"
     if rjson.get('FirstName') is not None and len(rjson.get('FirstName')) > 0:
@@ -62,11 +64,16 @@ if response.status_code == 200:
     if rjson.get('Address') is not None:
         address_street = f"{rjson.get('Address').get('street')}"
         address_city = f"{rjson.get('Address').get('postcode')} {rjson.get('Address').get('city')}"
+else:
+    if response.status_code != 404:
+        exit()
 
 customtkinter.set_appearance_mode("dark")
 root = customtkinter.CTk()
 root.resizable(False, False)
+root.call('wm', 'attributes', '.', '-topmost', True)
 root.configure(toolwindow=True)
+
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
