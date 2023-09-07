@@ -1,7 +1,5 @@
 option explicit
 
-rem cmdline to execute per default on each line
-rem use %num% as placeholder for the caller number and %name% for the caller name
 dim sCmdLineDefault
 sCmdLineDefault = "C:\Python311\pythonw.exe C:\SwyxWowiport\swclient.py %num%"
 
@@ -13,15 +11,8 @@ sCmdLine(1) = ""
 sCmdLine(2) = ""
 sCmdLine(3) = ""
 
-
-rem set this to true to enable verbose tracing
 dim VerboseTracing
 VerboseTracing = false
-
-
-rem don't change anything below this line
-rem =================================================================================
-
 
 dim clmgr
 set clmgr = WScript.CreateObject("CLMGR.ClientLineMgr","clmgr_")
@@ -46,6 +37,7 @@ const PubLSDisabled=14
 const PubLSDirectCall=15
 
 rem notification messsage ids
+const PubCLMgrLineDetailsChangedMessage = 2
 const PubCLMgrLineStateChangedMessageEx = 28
 
 rem line state arrays
@@ -72,30 +64,63 @@ TraceLineStates
 dim oWshShell
 set oWshShell = WScript.CreateObject("WScript.Shell")
 
+dim lastNumber
+dim resetTimer
+
 Do Until (0)
+	Trace "last_number: " & lastNumber
+	resetTimer = resetTimer - 1
+	if resetTimer = 0 then
+		lastNumber = ""
+	end if
 	WSCript.Sleep 1000
 Loop
 
 
+
+
 function clmgr_DispOnLineMgrNotification(msg, param)
+	dim lineIdx
+	dim sTemp
     if msg=PubCLMgrLineStateChangedMessageEx then
         rem line state changed
-		dim lineIdx
 		lineIdx = cint(param)and 255
 		lState(lineIdx) = (cint(param) and &Hff00) / &H100
         Trace vbLF & "param: " & param & " line " & lineIdx & " state: " & lState(lineIdx)
 		rem when line state changes from inactive to ringing
 		if lState(lineIdx)=PubLSRinging and lStateOld(lineIdx)=PubLSInactive then
 			rem state changed from inactive to ringing
-			dim sTemp
+			lastNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
+			resetTimer = 20
+
 			sTemp = GetCmdLine(lineIdx)
 			sTemp = Replace(sTemp,"%num%",Escape(clmgr.DispGetLine(lineIdx).DispPeerNumber))
-			sTemp = Replace(sTemp,"%name%",Escape(clmgr.DispGetLine(lineIdx).DispPeerName))
-			oWshShell.Run sTemp
+			lastNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
+			if Len(clmgr.DispGetLine(lineIdx).DispPeerNumber) > 3 then
+				oWshShell.Run sTemp
+				Trace clmgr.DispGetLine(lineIdx).DispPeerNumber
+			else
+				Trace "Ignored"
+			end if
 		end if
 		TraceLineStates
 		lStateOld(lineIdx) = lState(lineIdx)
     end if
+
+    if msg=PubCLMgrLineDetailsChangedMessage then
+    	 if clmgr.DispGetLine(lineIdx).DispPeerNumber <> lastNumber and len(lastNumber) > 0 then
+	    	lineIdx = CInt(param) and 255
+			sTemp = GetCmdLine(lineIdx)
+			sTemp = Replace(sTemp,"%num%",Escape(clmgr.DispGetLine(lineIdx).DispPeerNumber))
+			if Len(clmgr.DispGetLine(lineIdx).DispPeerNumber) > 3 then
+				oWshShell.Run sTemp
+				Trace clmgr.DispGetLine(lineIdx).DispPeerNumber
+			else
+				Trace "Ignored"
+			end if
+		end if
+	end if
+
 end function
 
 sub Trace(msg)
