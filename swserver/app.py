@@ -21,6 +21,14 @@ cache_use_units = settings.get("cache_use_units")
 cache_use_persons = settings.get("cache_persons")
 
 search_base = settings.get("search_base", "person").lower()
+prefer_contract_address_str = settings.get("prefer_contract_address")
+prefer_contract_address = False
+if prefer_contract_address_str is not None and len(prefer_contract_address_str) > 0:
+    if prefer_contract_address_str.lower() == "true":
+        prefer_contract_address = True
+
+prefer_use_unit_type = settings.get("prefer_use_unit_type")
+
 wowi.cache_from_disk(cache_type=wowi.CACHE_CONTRACTORS, file_name=cache_contractors)
 wowi.cache_from_disk(cache_type=wowi.CACHE_USE_UNITS, file_name=cache_use_units)
 wowi.cache_from_disk(cache_type=wowi.CACHE_PERSONS, file_name=cache_use_persons)
@@ -136,6 +144,7 @@ def caller_info():
         addr = None
 
     # Alle Verträge zur Person durchlaufen
+    address_overwritten_by_contract = False
     contract_list = []
     cont: Contractor
     contractors_found = wowi.get_contractors(person_id=first_person.id_, use_cache=True)
@@ -148,6 +157,25 @@ def caller_info():
             if datetime.today() > eoc:
                 print(f"{eoc} liegt nach {datetime.today()}")
                 continue
+        if prefer_contract_address:
+            overwrite_address = True
+            use_unit_idnum = cont.use_unit.use_unit_number
+            use_unit_obj = wowi.get_use_units(use_unit_idnum=use_unit_idnum)
+            if use_unit_obj is not None and len(use_unit_obj) > 0:
+                if address_overwritten_by_contract:
+                    use_unit_type = use_unit_obj[0].current_use_unit_type.use_unit_usage_type.name
+                    if use_unit_type != prefer_use_unit_type:
+                        overwrite_address = False
+
+                if overwrite_address:
+                    address_overwritten_by_contract = True
+                    addr = {
+                        'street': use_unit_obj[0].estate_address.street_complete,
+                        'postcode': use_unit_obj[0].estate_address.zip_,
+                        'city': use_unit_obj[0].estate_address.town,
+                        'position': use_unit_obj[0].description_of_position
+                    }
+
         t_contract = {
             "Id": cont.license_agreement_id,
             "IdNum": cont.license_agreement
