@@ -65,14 +65,8 @@ dim oWshShell
 set oWshShell = WScript.CreateObject("WScript.Shell")
 
 dim lastNumber
-dim resetTimer
 
 Do Until (0)
-	Trace "last_number: " & lastNumber
-	resetTimer = resetTimer - 1
-	if resetTimer = 0 then
-		lastNumber = ""
-	end if
 	WSCript.Sleep 1000
 Loop
 
@@ -90,17 +84,16 @@ function clmgr_DispOnLineMgrNotification(msg, param)
 		rem when line state changes from inactive to ringing
 		if lState(lineIdx)=PubLSRinging and lStateOld(lineIdx)=PubLSInactive then
 			rem state changed from inactive to ringing
-			lastNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
-			resetTimer = 20
-
+			currentNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
+			if currentNumber = lastNumber then
+			    return
+			end if
+			lastNumber = currentNumber
 			sTemp = GetCmdLine(lineIdx)
 			sTemp = Replace(sTemp,"%num%",Escape(clmgr.DispGetLine(lineIdx).DispPeerNumber))
-			lastNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
-			if Len(clmgr.DispGetLine(lineIdx).DispPeerNumber) > 3 then
+			if Len(currentNumber) > 3 then
 				oWshShell.Run sTemp
-				Trace clmgr.DispGetLine(lineIdx).DispPeerNumber
-			else
-				Trace "Ignored"
+				Trace currentNumber
 			end if
 		end if
 		TraceLineStates
@@ -108,15 +101,15 @@ function clmgr_DispOnLineMgrNotification(msg, param)
     end if
 
     if msg=PubCLMgrLineDetailsChangedMessage then
-    	 if clmgr.DispGetLine(lineIdx).DispPeerNumber <> lastNumber and len(lastNumber) > 0 then
+         currentNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
+    	 if currentNumber <> lastNumber and len(currentNumber) > 0 then
+    	    lastNumber = currentNumber
 	    	lineIdx = CInt(param) and 255
 			sTemp = GetCmdLine(lineIdx)
-			sTemp = Replace(sTemp,"%num%",Escape(clmgr.DispGetLine(lineIdx).DispPeerNumber))
-			if Len(clmgr.DispGetLine(lineIdx).DispPeerNumber) > 3 then
+			sTemp = Replace(sTemp,"%num%",Escape(currentNumber))
+			if Len(currentNumber) > 3 then
 				oWshShell.Run sTemp
 				Trace clmgr.DispGetLine(lineIdx).DispPeerNumber
-			else
-				Trace "Ignored"
 			end if
 		end if
 	end if
