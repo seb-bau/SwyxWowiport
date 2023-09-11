@@ -86,7 +86,7 @@ function clmgr_DispOnLineMgrNotification(msg, param)
 			rem state changed from inactive to ringing
 			currentNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
 			if currentNumber = lastNumber then
-			    return
+			    Exit Function
 			end if
 			lastNumber = currentNumber
 			sTemp = GetCmdLine(lineIdx)
