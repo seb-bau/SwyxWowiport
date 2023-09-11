@@ -63,7 +63,7 @@ TraceLineStates
 
 dim oWshShell
 set oWshShell = WScript.CreateObject("WScript.Shell")
-
+dim currentNumber
 dim lastNumber
 
 Do Until (0)
