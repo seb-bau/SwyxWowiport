@@ -4,9 +4,33 @@ from wowipy.wowipy import WowiPy, Contractor, Person
 from datetime import datetime
 import sqlite3
 import os
+import sys
+import logging
+import graypy
+
+
+def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    app.logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+
 
 app = Flask(__name__)
 settings = dotenv_values(os.path.join(app.root_path, ".env"))
+
+log_method = settings.get("log_method", "file").lower()
+log_level = settings.get("log_level", "info").lower()
+log_levels = {'debug': 10, 'info': 20, 'warning': 30, 'error': 40, 'critical': 50}
+app.logger.setLevel(log_levels.get(log_level, 20))
+sys.excepthook = handle_unhandled_exception
+if log_method == "file":
+    logging.basicConfig(filename=os.path.join(app.root_path, "log", "swserver"))
+elif log_method == "graylog":
+    graylog_host = settings.get("graylog_host", "127.0.0.1")
+    graylog_port = int(settings.get("graylog_port", 12201))
+    handler = graypy.GELFUDPHandler(graylog_host, graylog_port)
+    app.logger.addHandler(handler)
 
 # Wowiport-Daten einlesen
 wowi_host = settings.get("wowi_host")
@@ -29,6 +53,7 @@ if prefer_contract_address_str is not None and len(prefer_contract_address_str) 
 
 prefer_use_unit_type = settings.get("prefer_use_unit_type")
 
+app.logger.info("swserver started. CACHE_READ")
 wowi.cache_from_disk(cache_type=wowi.CACHE_CONTRACTORS, file_name=cache_contractors)
 wowi.cache_from_disk(cache_type=wowi.CACHE_USE_UNITS, file_name=cache_use_units)
 wowi.cache_from_disk(cache_type=wowi.CACHE_PERSONS, file_name=cache_use_persons)
@@ -69,14 +94,17 @@ def caller_info():
     #   "last_call_reason": "Grund des Anrufs" (falls Wowiport Ticket)
     phone = request.args.get("phone")
     if phone is None or len(phone) == 0:
+        app.logger.warning(f"phone arg missing. Client {request.remote_addr}, args {' '.join(request.args)}")
         return 'phone arg missing', 400
 
     clientname = request.args.get("client")
     if clientname is None or len(clientname) == 0:
+        app.logger.warning(f"client arg missing. Client {request.remote_addr}, args {' '.join(request.args)}")
         return 'client arg missing', 400
 
     db_path = os.path.join(app.root_path, "data", "data.sqlite3")
     if not os.path.isfile(db_path):
+        app.logger.critical("Database not found.")
         return 'Database error (not found)', 500
 
     con = sqlite3.connect(db_path)
@@ -95,13 +123,15 @@ def caller_info():
     con.close()
 
     if int(clientrow[0]) != 1:
+        app.logger.info(f"Client {clientname} ({request.remote_addr}) is disabled.")
         return 'client_disabled', 200
 
     # DIe Normalisierung der Telefonnummern wird bereits in der entsprechenden Methode
     # von WowiPy übernommen
 
     phone = phone.replace(' 49', '0')
-    print(phone)
+    app.logger.debug(f"Client {clientname} ({request.remote_addr}) submitted phone number {phone}")
+    app.logger.debug(f"Search Base: {search_base}")
     first_person: Person
     if search_base == "contractor":
         caller_found = wowi.search_contractor(search_phone=phone, allow_duplicates=True)
@@ -110,12 +140,14 @@ def caller_info():
             first_contractor = caller_found[0]
             first_person = first_contractor.person
         else:
+            app.logger.debug("No entry found.")
             return 'caller_not_found', 404
     else:
         caller_found = wowi.search_person(search_phone=phone)
         if len(caller_found) > 0:
             first_person = caller_found[0]
         else:
+            app.logger.debug("No entry found.")
             return 'caller_not_found', 404
 
     if first_person.is_natural_person:
@@ -155,7 +187,6 @@ def caller_info():
             else:
                 eoc = cont.end_of_contract
             if datetime.today() > eoc:
-                print(f"{eoc} liegt nach {datetime.today()}")
                 continue
         if prefer_contract_address:
             overwrite_address = True
@@ -191,7 +222,7 @@ def caller_info():
         "Contracts": contract_list
 
     }
-
+    app.logger.debug(f"Returned entry: {ret_dict}")
     return jsonify(ret_dict)
 
 
