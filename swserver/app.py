@@ -38,7 +38,7 @@ wowi_user = settings.get("wowi_user")
 wowi_pass = settings.get("wowi_pass")
 wowi_key = settings.get("wowi_key")
 
-wowi = WowiPy(wowi_host, wowi_user, wowi_pass, wowi_key)
+wowi = WowiPy(wowi_host, wowi_user, wowi_pass, wowi_key, logger=app.logger)
 # catalogs = wowi.get_communication_catalogs()
 cache_contractors = settings.get("cache_contractors")
 cache_use_units = settings.get("cache_use_units")
