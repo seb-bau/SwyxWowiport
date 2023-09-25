@@ -114,8 +114,8 @@ def caller_info():
         first_name = first_person.first_name
         last_name = first_person.last_name
     else:
-        first_name = first_person.long_name2
-        last_name = first_person.long_name1
+        first_name = first_person.long_name_2
+        last_name = first_person.long_name_1
 
     if first_person.addresses is not None:
         first_address: Address
