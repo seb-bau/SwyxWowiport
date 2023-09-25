@@ -3,6 +3,7 @@ from dotenv import dotenv_values
 from wowicache.models import WowiCache, UseUnit, Person, Contractor, Communication, Address, Contract
 from sqlalchemy import or_, and_
 from datetime import datetime
+from datetime import date
 import sqlite3
 import os
 import sys
@@ -141,7 +142,7 @@ def caller_info():
                 eoc = datetime.strptime(str(end_of_contract), "%Y-%m-%d")
             else:
                 eoc = end_of_contract
-            if datetime.today() > eoc:
+            if date.today() > eoc:
                 continue
         if prefer_contract_address:
             overwrite_address = True
