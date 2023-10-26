@@ -1,0 +1,10 @@
+Flask~=2.3.3
+python-dotenv~=1.0.0
+wowicache~=1.0.9
+pymysql~=1.1.0
+sqlalchemy~=2.0.22
+graypy~=2.1.0
+jsonmerge~=1.9.2
+pyhumps~=3.8.0
+requests-cache~=1.1.0
+uwsgi
