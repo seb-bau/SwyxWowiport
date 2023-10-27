@@ -81,18 +81,18 @@ function clmgr_DispOnLineMgrNotification(msg, param)
 		lineIdx = cint(param)and 255
 		lState(lineIdx) = (cint(param) and &Hff00) / &H100
         Trace vbLF & "param: " & param & " line " & lineIdx & " state: " & lState(lineIdx)
-		rem when line state changes from inactive to ringing
-		if lState(lineIdx)=PubLSRinging and lStateOld(lineIdx)=PubLSInactive then
-			rem state changed from inactive to ringing
+
+        if lState(lineIdx)=PubLSTerminated or lState(lineIdx)=PubLSTransferring or lState(lineIdx)=PubLSInactive Then
+        	lastNumber = ""
+        end if
+
+		if lState(lineIdx)=PubLSRinging and lStateOld(lineIdx)=PubLSInactive and lastNumber <> currentNumber then
 			currentNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
-			if currentNumber = lastNumber then
-			    Exit Function
-			end if
-			lastNumber = currentNumber
 			sTemp = GetCmdLine(lineIdx)
 			sTemp = Replace(sTemp,"%num%",Escape(clmgr.DispGetLine(lineIdx).DispPeerNumber))
 			if Len(currentNumber) > 3 then
 				oWshShell.Run sTemp
+				lastNumber = currentNumber
 				Trace currentNumber
 			end if
 		end if
@@ -101,15 +101,15 @@ function clmgr_DispOnLineMgrNotification(msg, param)
     end if
 
     if msg=PubCLMgrLineDetailsChangedMessage then
+    	 lineIdx = cint(param)and 255
          currentNumber = clmgr.DispGetLine(lineIdx).DispPeerNumber
-    	 if currentNumber <> lastNumber and len(currentNumber) > 0 then
-    	    lastNumber = currentNumber
-	    	lineIdx = CInt(param) and 255
+    	 if lStateOld(lineIdx) = PubLSRinging and lastNumber <> currentNumber Then
 			sTemp = GetCmdLine(lineIdx)
 			sTemp = Replace(sTemp,"%num%",Escape(currentNumber))
 			if Len(currentNumber) > 3 then
+				lastNumber = currentNumber
 				oWshShell.Run sTemp
-				Trace clmgr.DispGetLine(lineIdx).DispPeerNumber
+				Trace currentNumber
 			end if
 		end if
 	end if
