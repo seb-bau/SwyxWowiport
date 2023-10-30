@@ -1,5 +1,11 @@
 option explicit
 
+dim regValue
+regValue = ReadFromRegistry("HKCU\Software\WBG\swyxwowiport_enabled", "true")
+if regValue <> "true" Then
+	WScript.Quit
+end if
+
 dim sCmdLineDefault
 sCmdLineDefault = "C:\Python311\pythonw.exe C:\SwyxWowiport\swclient.py %num%"
 
@@ -141,3 +147,19 @@ function GetCmdLine(lineidx)
 		GetCmdLine = sCmdLine(lineIdx)
 	end if
 end function
+
+Function ReadFromRegistry(strRegistryKey, strDefault)
+    Dim WSHShell, value
+
+    On Error Resume Next
+    Set WSHShell = CreateObject("WScript.Shell")
+    value = WSHShell.RegRead( strRegistryKey )
+
+    If err.number <> 0 Then
+        readFromRegistry = strDefault
+    Else
+        readFromRegistry = value
+    End If
+
+    Set WSHShell = Nothing
+End Function
