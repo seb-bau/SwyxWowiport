@@ -74,7 +74,6 @@ root.resizable(False, False)
 root.call('wm', 'attributes', '.', '-topmost', True)
 root.configure(toolwindow=True)
 
-
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 
@@ -119,24 +118,25 @@ if rjson is not None:
     mybutton.configure(anchor=CENTER)
     mybutton.pack()
 
-    space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 10))
-    space_label.configure(anchor=CENTER)
-    space_label.pack()
-
-    mybutton = customtkinter.CTkButton(master=root, text=f"Person\n{rjson.get('IdNum')}",
-                                       command=lambda: open_url(f"{wowi_url}/open/Person/{rjson.get('Id')}"))
-    mybutton.configure(anchor=CENTER)
-    mybutton.pack()
-
     contracts = rjson.get('Contracts')
-    for entry in contracts:
+    if contracts is None or len(contracts) == 0:
         space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 10))
         space_label.configure(anchor=CENTER)
         space_label.pack()
 
+        mybutton = customtkinter.CTkButton(master=root, text=f"Person\n{rjson.get('IdNum')}",
+                                           command=lambda: open_url(f"{wowi_url}/open/Person/{rjson.get('Id')}"))
+        mybutton.configure(anchor=CENTER)
+        mybutton.pack()
+
+    for entry in contracts:
+        space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 5))
+        space_label.configure(anchor=CENTER)
+        space_label.pack()
+
+        buttonurl = f"{wowi_url}/open/LicenseAgreement/{entry.get('Id')}"
         conbutton = customtkinter.CTkButton(master=root, text=f"Vertrag\n{entry.get('IdNum')}",
-                                            command=lambda: open_url(f"{wowi_url}/open/LicenseAgreement"
-                                                                     f"/{entry.get('Id')}"))
+                                            command=lambda burl=buttonurl: open_url(burl))
         conbutton.configure(anchor=CENTER)
         conbutton.pack()
 
