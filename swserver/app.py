@@ -117,7 +117,7 @@ def caller_info():
         first_name = first_person.long_name_2
         last_name = first_person.long_name_1
 
-    if first_person.addresses is not None:
+    if first_person.addresses:
         first_address: Address
         first_address = first_person.addresses[0]
         addr = {
