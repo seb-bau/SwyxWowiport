@@ -1,13 +1,17 @@
 option explicit
 
 dim regValue
-regValue = ReadFromRegistry("HKCU\Software\WBG\swyxwowiport_enabled", "true")
+regValue = ReadFromRegistry("HKCU\Software\SwyxWowiport\enabled", "true")
+appPath = ReadFromRegistry("HKCU\Software\SwyxWowiport\path", "C:\Program Files (x86)\swyxwowiport")
+If Right(appPath, 1) <> "\" Then
+    appPath = appPath & "\"
+End If
 if regValue <> "true" Then
 	WScript.Quit
 end if
 
 dim sCmdLineDefault
-sCmdLineDefault = "C:\Python311\pythonw.exe C:\SwyxWowiport\swclient.py %num%"
+sCmdLineDefault = appPath & "swclient.exe %num%"
 
 rem cmdline to execute on specific lines. Default is used when nothing is specified here
 rem Increase this array if you have more lines

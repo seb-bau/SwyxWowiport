@@ -1,144 +1,205 @@
-import os
-import requests
-import platform
-from tkinter import *
-from dotenv import dotenv_values
-import customtkinter
 import sys
+import platform
 import webbrowser
+import requests
+import winreg
+import customtkinter
+from tkinter import CENTER
 
+# ---------------------------
+# Config
+# ---------------------------
+
+KEY_PATH = r"Software\SwyxWowiport"
+REQUIRED_STRINGS = ("wowi_url", "api_key", "host")
+NUMERIC_KEYS = ("app_width", "app_height", "sub_xpos", "sub_ypos")
+
+DEFAULTS = {
+    "app_width": 300,
+    "app_height": 400,
+    "sub_xpos": 10,
+    "sub_ypos": 80,
+}
+
+HTTP_TIMEOUT = 5  # seconds
+
+
+# ---------------------------
+# Helper Functions
+# ---------------------------
 
 def open_url(ourl: str) -> None:
     webbrowser.open(ourl, new=0, autoraise=True)
 
 
-if len(sys.argv) == 1:
-    exit()
+def read_registry_values() -> dict:
+    values = DEFAULTS.copy()
 
-curr_dir = os.path.abspath(os.path.dirname(__file__))
-settings = dotenv_values(os.path.join(curr_dir, ".env"))
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, KEY_PATH, 0, winreg.KEY_READ) as key:
+            for name in REQUIRED_STRINGS:
+                try:
+                    val, rtype = winreg.QueryValueEx(key, name)
+                    # noinspection PyTypeChecker
+                    values[name] = str(val)
+                except FileNotFoundError:
+                    print(f"Missing registry value: {name}")
+                    sys.exit(1)
 
-app_width = int(settings.get("app_width", 300))
-app_height = int(settings.get("app_height", 400))
-sub_xpos = int(settings.get("sub_xpos", 10))
-sub_ypos = int(settings.get("sub_ypos", 80))
-wowi_url = settings.get("wowi_url")
+            for name in NUMERIC_KEYS:
+                try:
+                    val, rtype = winreg.QueryValueEx(key, name)
+                    if rtype == winreg.REG_DWORD:
+                        values[name] = int(val)
+                    else:
+                        values[name] = int(str(val))
+                except (FileNotFoundError, ValueError, TypeError):
+                    # Fallback to defaults
+                    pass
+    except FileNotFoundError:
+        print(f"Registry-Key {KEY_PATH} not found.")
+        sys.exit(1)
 
-app_xpos_rel = app_width * -1 - sub_xpos
-app_ypos_rel = app_height * -1 - sub_ypos
-api_key = settings.get("key")
-caller = sys.argv[1]
-if len(caller) < 3:
-    exit()
+    return values
 
-# Normalisierung für das WOwiport Protokollfenster
-if caller.startswith("00"):
-    caller = caller[1:]
 
-host = settings.get("host")
+def fetch_caller_info(phost: str, papi_key: str, phone: str, client: str) -> dict | None:
+    url = f"{phost.rstrip('/')}/caller_info"
+    headers = {"Authorization": f"Bearer {papi_key}"}
+    params = {"phone": phone, "client": client}
+
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=HTTP_TIMEOUT)
+    except requests.RequestException as ex:
+        print(f"http error: {ex}")
+        return None
+
+    if resp.status_code == 404:
+        return None
+    if resp.status_code != 200:
+        print(f"unexpected http status: {resp.status_code}")
+        return None
+
+    if "client_disabled" in resp.text:
+        return None
+
+    try:
+        return resp.json()
+    except ValueError:
+        print("Invalid json")
+        return None
+
+
+def normalize_caller(arg: str) -> str:
+    if arg.startswith("00"):
+        return arg[1:]
+    return arg
+
+
+def make_label(master, text, font, pady=0):
+    lbl = customtkinter.CTkLabel(master=master, text=text, font=font, anchor=CENTER)
+    lbl.pack(pady=pady)
+    return lbl
+
+
+def make_button(master, text, url):
+    btn = customtkinter.CTkButton(master=master, text=text,
+                                  command=lambda: open_url(url))
+    btn.pack()
+    return btn
+
+
+# ---------------------------
+# Main application run
+# ---------------------------
+
+if len(sys.argv) <= 1:
+    print("missing caller argument")
+    sys.exit(0)
+
+# Show popup only if the caller is an external number. Ignore if number too short
+caller_raw = sys.argv[1]
+if len(caller_raw) < 3:
+    sys.exit(0)
+
+caller = normalize_caller(caller_raw)
 client_name = platform.node()
 
-url = f"{host}/caller_info"
-params = {
-    'phone': caller,
-    'client': client_name
-}
+vals = read_registry_values()
+app_width = vals["app_width"]
+app_height = vals["app_height"]
+sub_xpos = vals["sub_xpos"]
+sub_ypos = vals["sub_ypos"]
+wowi_url = vals["wowi_url"].rstrip("/")
+api_key = vals["api_key"]
+host = vals["host"].rstrip("/")
 
-payload = {}
-headers = {
-    f'Authorization': f'Bearer {api_key}'
-}
+# backend call
+rjson = fetch_caller_info(host, api_key, caller, client_name)
 
-response = requests.request("GET", url, headers=headers, data=payload, params=params)
+# Prepare view info
 caller_name = "Unbekannt"
 address_street = ""
 address_city = ""
-rjson = None
-if response.status_code == 200:
-    if 'client_disabled' in response.text:
-        exit()
-    rjson = response.json()
-    caller_name = f"{rjson.get('LastName')}"
-    if rjson.get('FirstName') is not None and len(rjson.get('FirstName')) > 0:
-        caller_name = f"{caller_name}, {rjson.get('FirstName')}"
-    if rjson.get('Address') is not None:
-        address_street = f"{rjson.get('Address').get('street')}"
-        address_city = f"{rjson.get('Address').get('postcode')} {rjson.get('Address').get('city')}"
-else:
-    if response.status_code != 404:
-        exit()
+
+if rjson:
+    last = rjson.get("LastName") or ""
+    first = rjson.get("FirstName") or ""
+    caller_name = f"{last}, {first}".strip(", ").strip()
+    addr = rjson.get("Address") or {}
+    address_street = addr.get("street") or ""
+    city = addr.get("city") or ""
+    postcode = addr.get("postcode") or ""
+    address_city = f"{postcode} {city}".strip()
+
+# ---------------------------
+# UI
+# ---------------------------
 
 customtkinter.set_appearance_mode("dark")
 root = customtkinter.CTk()
-root.resizable(False, False)
-root.call('wm', 'attributes', '.', '-topmost', True)
-root.configure(toolwindow=True)
-
-screen_width = root.winfo_screenwidth()
-screen_height = root.winfo_screenheight()
-
-xpos = screen_width + app_xpos_rel
-ypos = screen_height + app_ypos_rel
-
-root.geometry('%dx%d+%d+%d' % (app_width, app_height, xpos, ypos))
-
-top_label = customtkinter.CTkLabel(master=root, text="Anruf von:", font=("Arial", 18))
-top_label.configure(anchor=CENTER)
-top_label.pack()
-
-caller_label = customtkinter.CTkLabel(master=root, text=caller_name,
-                                      font=("Arial", 25))
-caller_label.configure(anchor=CENTER)
-caller_label.pack()
-
-address_label = customtkinter.CTkLabel(master=root, text=f"({caller})", font=("Arial", 15))
-address_label.configure(anchor=CENTER)
-address_label.pack()
-
-space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 16))
-space_label.configure(anchor=CENTER)
-space_label.pack()
-
-address_label = customtkinter.CTkLabel(master=root, text=address_street, font=("Arial", 16))
-address_label.configure(anchor=CENTER)
-address_label.pack()
-
-city_label = customtkinter.CTkLabel(master=root, text=address_city, font=("Arial", 16))
-city_label.configure(anchor=CENTER)
-city_label.pack()
-
-if rjson is not None:
-
-    space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 10))
-    space_label.configure(anchor=CENTER)
-    space_label.pack()
-
-    mybutton = customtkinter.CTkButton(master=root, text=f"Ticket erstellen",
-                                       command=lambda: open_url(f"{wowi_url}/CallProtocol?PhoneNumber={caller}"))
-    mybutton.configure(anchor=CENTER)
-    mybutton.pack()
-
-    contracts = rjson.get('Contracts')
-    if contracts is None or len(contracts) == 0:
-        space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 10))
-        space_label.configure(anchor=CENTER)
-        space_label.pack()
-
-        mybutton = customtkinter.CTkButton(master=root, text=f"Person\n{rjson.get('IdNum')}",
-                                           command=lambda: open_url(f"{wowi_url}/open/Person/{rjson.get('Id')}"))
-        mybutton.configure(anchor=CENTER)
-        mybutton.pack()
-
-    for entry in contracts:
-        space_label = customtkinter.CTkLabel(master=root, text="", font=("Arial", 5))
-        space_label.configure(anchor=CENTER)
-        space_label.pack()
-
-        buttonurl = f"{wowi_url}/open/LicenseAgreement/{entry.get('Id')}"
-        conbutton = customtkinter.CTkButton(master=root, text=f"Vertrag\n{entry.get('IdNum')}",
-                                            command=lambda burl=buttonurl: open_url(burl))
-        conbutton.configure(anchor=CENTER)
-        conbutton.pack()
-
 root.title("Anrufer-Info")
+root.resizable(False, False)
+root.attributes("-topmost", True)
+
+# try:
+#     root.attributes("-toolwindow", True)
+# except Exception as e:
+#     print(str(e))
+#     pass
+
+# Position bottom right (relative)
+screen_w = root.winfo_screenwidth()
+screen_h = root.winfo_screenheight()
+xpos = screen_w - (sub_xpos + app_width)
+ypos = screen_h - (sub_ypos + app_height)
+root.geometry(f"{app_width}x{app_height}+{xpos}+{ypos}")
+
+# Content
+make_label(root, "Anruf von:", ("Arial", 18), pady=2)
+make_label(root, caller_name or "Unbekannt", ("Arial", 25), pady=0)
+make_label(root, f"({caller})", ("Arial", 15), pady=4)
+make_label(root, "", ("Arial", 8), pady=0)
+make_label(root, address_street, ("Arial", 16), pady=0)
+make_label(root, address_city, ("Arial", 16), pady=0)
+
+if rjson:
+    make_label(root, "", ("Arial", 10), pady=0)
+    make_button(root, "Ticket erstellen",
+                f"{wowi_url}/CallProtocol?PhoneNumber={caller}")
+
+    contracts = rjson.get("Contracts")
+    if not contracts:
+        make_label(root, "", ("Arial", 10), pady=0)
+        make_button(root, f"Person\n{rjson.get('IdNum')}",
+                    f"{wowi_url}/open/Person/{rjson.get('Id')}")
+    else:
+        for entry in contracts:
+            make_label(root, "", ("Arial", 5), pady=0)
+            cid = entry.get("Id")
+            cidnum = entry.get("IdNum")
+            if cid:
+                make_button(root, f"Vertrag\n{cidnum}",
+                            f"{wowi_url}/open/LicenseAgreement/{cid}")
+
 root.mainloop()
