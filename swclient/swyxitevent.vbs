@@ -1,8 +1,8 @@
 option explicit
 
 dim regValue
-regValue = ReadFromRegistry("HKCU\Software\SwyxWowiport\enabled", "true")
-appPath = ReadFromRegistry("HKCU\Software\SwyxWowiport\path", "C:\Program Files (x86)\swyxwowiport")
+regValue = ReadFromRegistry("HKLM\Software\SwyxWowiport\enabled", "true")
+appPath = ReadFromRegistry("HKLM\Software\SwyxWowiport\path", "C:\Program Files\swyxwowiport")
 If Right(appPath, 1) <> "\" Then
     appPath = appPath & "\"
 End If

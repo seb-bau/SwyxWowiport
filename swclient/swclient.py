@@ -36,7 +36,7 @@ def read_registry_values() -> dict:
     values = DEFAULTS.copy()
 
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, KEY_PATH, 0, winreg.KEY_READ) as key:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, KEY_PATH, 0, winreg.KEY_READ) as key:
             for name in REQUIRED_STRINGS:
                 try:
                     val, rtype = winreg.QueryValueEx(key, name)
