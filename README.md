@@ -12,6 +12,7 @@ Das Fenster erscheint bei einem eingehenden Anruf in der unteren rechten Ecke de
 ### Voraussetzungen
 * Wowiport ERP (für die Ticket-Funktion muss das Nachrichtencenter aktiv sein)
 * OPENWOWI-API-Key
+* Instanz von Wowicache (siehe https://github.com/seb-bau/wowicache)
 * SwyxIt!-Client (getestet mit SwyxIt! Classic 14.11)
 * Server, auf dem die Serverkomponente der Anwendung läuft. Dies kann ein ein Linux- oder Windows-Server sein, wahlweise  
 lokal oder in "der Cloud"
@@ -19,7 +20,7 @@ lokal oder in "der Cloud"
 ### Funktion
 Die Anwendung besteht aus einem Server und beliebig vielen Clients. Der Server ruft regelmäßig die Mieterbestandsdaten
 über OPENWOWI ab
- und speichert sie zwischen. Bei einem eingehenden Anruf senden die Clients die Nummer des Anrufers an den Server. Wird
+ und speichert sie zwischen (wowicache). Bei einem eingehenden Anruf senden die Clients die Nummer des Anrufers an den Server. Wird
  die Rufnummer im Bestand gefunden, sendet der Server die Mieterdaten und die zugehörigen Vertragsinformationen an den
  Client.
 
@@ -32,11 +33,15 @@ Anrufprotokoll im Client entstehen
 ### Installation (Server)
 Die Anleitung bezieht sich auf Ubuntu Server 24.04. Eine Installation auf einem Windows-Server ist möglich, wird hier 
 jedoch nicht behandelt
-1. OPENWOWI-API-Key in Wowiport erzeugen. Notwendige Endpunktberechtigungen: Objektdaten, Personen lesen, Vertragsdaten
-mit personenbezogenen Details
-2. Repository klonen (z.B. nach /opt/swyxwowiport)
-3. Requirements aus swserver/requirements.txt via pip installieren (ggf. virtuelles Environment erstellen)
-4. Die Konfig-Dateien aus /opt/swyxwowiport/config zu app.ini und server.ini kopieren
-5. 
+1. Wowicache in Betrieb nehmen
+2. swserver konfiguireren und starten (Flask / uwsgi)
+3. ggf. systemd unit anlegen (siehe swserver/swyxwowiport.service)
+
+Hinweis: Wer den Server nicht selbst einrichten / betreiben möchte, kann eine Installation bei mir buchen. Kontakt via https://www.bytewish.de
 
 ### Installation (Client)
+Die einfachste Verteilung erfolgt über das prebuild Setup (siehe Veröffentlichungen):
+setup.exe an die Clients verteilen und Silent installieren:
+swclient_setup.exe /SILENT /APIKEY=XXX /WOWIURL=https://meine-firma.wowiport.de /HOST=10.10.10.10
+XXX steht dabei für den API-Key, der auf dem swserver gesetzt wurde, die URL muss angepasst werden und als Host wird der swserver verwendet  
+Alternativ kann die Installation auch per GUI erfolgen, dann müssen im Anschluss die entsprechenden Werte in HKLM\Software\SwyxWowiport eingetragen werden.

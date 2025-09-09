@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify, json
-from dotenv import dotenv_values
 from wowicache.models import WowiCache, UseUnit, Person, Contractor, Communication, Address, Contract
 from sqlalchemy import or_, and_
 from datetime import datetime
@@ -9,6 +8,7 @@ import os
 import sys
 import logging
 import graypy
+import configparser
 
 
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
@@ -19,29 +19,28 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
 
 
 app = Flask(__name__)
-settings = dotenv_values(os.path.join(app.root_path, ".env"))
 
-log_method = settings.get("log_method", "file").lower()
-log_level = settings.get("log_level", "info").lower()
+config = configparser.ConfigParser()
+config.read(os.path.join(app.root_path, "config.ini"))
+
+log_method = config.get("logging", "method", fallback="file").lower()
+log_level = config.get("logging", "level", fallback="info").lower()
+
 log_levels = {'debug': 10, 'info': 20, 'warning': 30, 'error': 40, 'critical': 50}
 app.logger.setLevel(log_levels.get(log_level, 20))
 sys.excepthook = handle_unhandled_exception
 if log_method == "file":
-    logging.basicConfig(filename=os.path.join(app.root_path, "log", "swserver.log"))
+    logging.basicConfig(filename=os.path.join(app.root_path, "logs", "swserver.log"))
 elif log_method == "graylog":
-    graylog_host = settings.get("graylog_host", "127.0.0.1")
-    graylog_port = int(settings.get("graylog_port", 12201))
+    graylog_host = config.get("logging", "graylog_host", fallback="127.0.0.1")
+    graylog_port = config.getint("logging", "graylog_port", fallback=12201)
     handler = graypy.GELFUDPHandler(graylog_host, graylog_port)
     app.logger.addHandler(handler)
 
-search_base = settings.get("search_base", "person").lower()
-prefer_contract_address_str = settings.get("prefer_contract_address")
-prefer_contract_address = False
-if prefer_contract_address_str is not None and len(prefer_contract_address_str) > 0:
-    if prefer_contract_address_str.lower() == "true":
-        prefer_contract_address = True
+search_base = config.get("general", "search_base", fallback="person").lower()
+prefer_contract_address = config.getbool("general", "prefer_contract_address", fallback=True)
 
-prefer_use_unit_type = settings.get("prefer_use_unit_type")
+prefer_use_unit_type = config.get("general",  "prefer_use_unit_type")
 
 app.logger.info("swserver started.")
 
@@ -69,7 +68,7 @@ def caller_info():
         app.logger.warning(f"client arg missing. Client {request.remote_addr}, args {' '.join(request.args)}")
         return 'client arg missing', 400
 
-    db_path = os.path.join(app.root_path, "data", "data.sqlite3")
+    db_path = os.path.join(app.root_path, "..", "db", "data.sqlite3")
     if not os.path.isfile(db_path):
         app.logger.critical("Database not found.")
         return 'Database error (not found)', 500
@@ -93,7 +92,7 @@ def caller_info():
         app.logger.info(f"Client {clientname} ({request.remote_addr}) is disabled.")
         return 'client_disabled', 200
 
-    db = WowiCache(settings.get("db_connection_string"))
+    db = WowiCache(config.get("datasource", "db_connection_string"))
 
     phone = phone.replace(' 49', '0')
     app.logger.debug(f"Client {clientname} ({request.remote_addr}) submitted phone number {phone}")
@@ -138,7 +137,7 @@ def caller_info():
         tcontract = cont.contract
         end_of_contract = tcontract.contract_end
         if end_of_contract is not None:
-            if type(end_of_contract) == str:
+            if type(end_of_contract) is str:
                 eoc = datetime.strptime(str(end_of_contract), "%Y-%m-%d")
             else:
                 eoc = end_of_contract
@@ -297,6 +296,8 @@ def clients(client_id: str = None):
 
             con.close()
             return {'id': cur.lastrowid}, 201
+    else:
+        return 'wrong method', 400
 
 
 @app.before_request
@@ -313,11 +314,13 @@ def before_request():
     r_key = get_token(request.headers.get('Authorization'))
 
     if current_endpoint in client_endpoints:
-        if settings['client_key'] != r_key and settings['admin_key'] != r_key:
+        if (config.get("auth", "client_key", fallback=None) != r_key and
+                config.get("auth", "admin_key", fallback=None) != r_key):
             return "Unauthorized.", 401
     elif current_endpoint in admin_endpoints:
-        if settings['admin_key'] != r_key:
+        if config.get("auth", "admin_key", fallback=None) != r_key:
             return "Unauthorized.", 401
+    return True
 
 
 if __name__ == '__main__':

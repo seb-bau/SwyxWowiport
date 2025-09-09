@@ -1,0 +1,17 @@
+[datasource]
+db_connection_string =
+
+[auth]
+client_key =
+admin_key =
+
+[general]
+search_base = person
+prefer_contract_address = true
+prefer_use_unit_type = Wohnung
+
+[logging]
+log_method = file
+log_level = info
+graylog_host = 127.0.0.1
+graylog_port = 12201
