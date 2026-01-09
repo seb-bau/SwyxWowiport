@@ -5,6 +5,7 @@ import requests
 import winreg
 import customtkinter
 from tkinter import CENTER
+from datetime import datetime
 
 # ---------------------------
 # Config
@@ -176,7 +177,7 @@ ypos = screen_h - (sub_ypos + app_height)
 root.geometry(f"{app_width}x{app_height}+{xpos}+{ypos}")
 
 # Content
-make_label(root, "Anruf von:", ("Arial", 18), pady=2)
+make_label(root, f"Anruf ({datetime.now().strftime('%d.%m.%y %H:%M:%S')}) von:", ("Arial", 14), pady=2)
 make_label(root, caller_name or "Unbekannt", ("Arial", 25), pady=0)
 make_label(root, f"({caller})", ("Arial", 15), pady=4)
 make_label(root, "", ("Arial", 8), pady=0)

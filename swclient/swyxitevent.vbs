@@ -3,6 +3,7 @@ option explicit
 ' Original Credit: Tom Wellige, https://www.swyxforum.com/files/file/36-vbscript-open-browser-on-incoming-call
 
 dim regValue
+dim appPath
 regValue = ReadFromRegistry("HKLM\Software\SwyxWowiport\enabled", "true")
 appPath = ReadFromRegistry("HKLM\Software\SwyxWowiport\path", "C:\Program Files\swyxwowiport")
 If Right(appPath, 1) <> "\" Then

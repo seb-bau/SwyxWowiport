@@ -8,20 +8,23 @@
 
 [Setup]
 AppName=SwyxWowiport Client
-AppVersion=1.0.0
-DefaultDirName={pf}\SwyxWowiport
+AppVersion=1.0.1
+DefaultDirName={commonpf}\SwyxWowiport
 DefaultGroupName=SwyxWowiport
 PrivilegesRequired=admin
-ArchitecturesAllowed=x86 x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x86 x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 OutputBaseFilename=swclient_setup
 
 [Files]
-Source: "swclient.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "swyxitevent.vbs"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\swclient\swclient.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\swclient\_internal\*"; \
+    DestDir: "{app}\_internal"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\swclient\swyxitevent.vbs"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
 Root: HKLM64; Subkey: "Software\SwyxWowiport"; Flags: uninsdeletekeyifempty
